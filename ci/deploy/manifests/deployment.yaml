@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: javaapp
+  namespace: dev
+  labels:
+    app: javaapp
+spec:
+  replicas: 3
+  progressDeadlineSeconds: 180
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: javaapp
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 35
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: javaapp
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                - key: name
+                  operator: In
+                  values:
+                  - javaapp
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      containers:
+        - name: javaapp-container
+          image: "rohith369/javaapp:latest"
+          imagePullPolicy: Always
+          env:
+          ports:
+           - containerPort: 9090
+             name: http-port         
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http-port
+              scheme: HTTP
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+            timeoutSeconds: 1
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http-port
+              scheme: HTTP
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 300m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi           
+      imagePullSecrets:
+      - name: dockerlogin

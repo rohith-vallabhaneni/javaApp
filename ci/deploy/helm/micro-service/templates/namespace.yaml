@@ -1,0 +1,7 @@
+{{ $global := . }}
+{{- if $global.Values.namespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $global.Values.namespace }}
+{{- end }}

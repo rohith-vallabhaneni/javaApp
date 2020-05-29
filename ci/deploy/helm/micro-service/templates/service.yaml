@@ -1,0 +1,24 @@
+{{ $global := . }}
+{{- if $global.Values.service }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $global.Values.name }}
+  labels:
+    app: {{ $global.Values.name }}
+  namespace: {{ $global.Values.namespace }}
+spec:
+  type: ClusterIP
+  ports:
+    {{- range $service := $global.Values.service }}
+    - port: {{ $service.port }}
+      targetPort: {{ $service.targetPort }}
+      protocol: {{ $service.protocol }}
+      {{- if $service.name }}
+      name: {{ $service.name }}
+      {{- end }}
+    {{- end }}
+  selector:
+    app: {{ $global.Values.name }}
+{{- end }}

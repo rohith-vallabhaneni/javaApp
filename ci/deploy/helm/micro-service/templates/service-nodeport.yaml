@@ -1,0 +1,25 @@
+{{ $global := . }}
+{{- if $global.Values.service_nodeport }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $global.Values.name }}-nodeport
+  labels:
+    app: {{ $global.Values.name }}
+  namespace: {{ $global.Values.namespace }}
+spec:
+  type: NodePort
+  ports:
+    {{- range $service := $global.Values.service_nodeport }}
+    - nodePort: {{ $service.nodePort }}
+      port: {{ $service.port }}
+      targetPort: {{ $service.targetPort }}
+      protocol: {{ $service.protocol }}
+      {{- if $service.name }}
+      name: {{ $service.name }}
+      {{- end }}
+    {{- end }}
+  selector:
+    app: {{ $global.Values.name }}
+{{- end }}

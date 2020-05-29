@@ -1,0 +1,128 @@
+{{ $global := . }}
+{{- if $global.Values.deployment }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $global.Values.name }}
+  namespace: {{ $global.Values.namespace }}
+  labels:
+    app: {{ $global.Values.name }}
+spec:
+  replicas: {{ $global.Values.deployment.replicas }}
+  progressDeadlineSeconds: 180
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: {{ $global.Values.name }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 35
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: {{ $global.Values.name }}
+    spec:
+      affinity:
+        {{- if $global.Values.deployment.instancegroup }}
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: instancegroup
+                operator: In
+                values:
+                - {{ $global.Values.deployment.instancegroup }}
+        {{- end }}
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchExpressions:
+                - key: name
+                  operator: In
+                  values:
+                  - {{ $global.Values.name }}
+      {{- if $global.Values.deployment.mountSecrets }}
+      volumes:
+        {{- range $mountSecret := $global.Values.deployment.mountSecrets }}
+        - name: {{ $mountSecret.mountName }}
+          secret:
+            secretName: {{ $mountSecret.secret }}
+        {{- end }}
+      {{- end }}
+      {{- if $global.Values.deployment.dnsPolicy}}
+      dnsPolicy: {{$global.Values.deployment.dnsPolicy}}
+      {{- end }}
+      {{- if $global.Values.deployment.hostNetwork}}
+      hostNetwork: {{$global.Values.deployment.hostNetwork}}
+      {{- end }}
+      restartPolicy: Always
+      containers:
+        - name: {{ $global.Values.name }}-container
+          image: "{{ $global.Values.deployment.image }}"
+          imagePullPolicy: Always
+          env:
+          {{- range $secret := $global.Values.deployment.secrets }}
+          {{- range .keys}}
+          - name: {{.}}
+            valueFrom:
+              secretKeyRef: 
+                name: {{ $secret.secretName }}
+                key: {{.}}
+          {{- end}}
+          {{- end}}
+          {{- if $global.Values.deployment.mountSecrets }}
+          volumeMounts:
+          {{- range $mountSecret := $global.Values.deployment.mountSecrets }}
+          - name: {{ $mountSecret.mountName }}
+            readOnly: true
+            mountPath: {{ $mountSecret.mountPath | quote}}
+          {{- end }}
+          {{- end }}
+          {{- if $global.Values.deployment.healthcheckPort }}
+          ports:
+           - containerPort: {{ $global.Values.deployment.healthcheckPort }}
+             name: http-port
+          {{- end }}
+          {{- if $global.Values.deployment.livenessRoute }}         
+          livenessProbe:
+            httpGet:
+              path: {{ $global.Values.deployment.livenessRoute }}
+              port: http-port
+              scheme: HTTP
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+            timeoutSeconds: 1
+          {{- end }}
+          {{- if $global.Values.deployment.readinessRoute }}
+          readinessProbe:
+            httpGet:
+              path: {{ $global.Values.deployment.readinessRoute }}
+              port: http-port
+              scheme: HTTP
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+            timeoutSeconds: 1
+          {{- end }}
+          resources:
+            {{- toYaml $global.Values.deployment.resources | nindent 12 }}
+      {{- if $global.Values.deployment.initContainers }}
+      initContainers:
+        - name: {{ $global.Values.deployment.initContainers.name }}
+          image: {{ $global.Values.deployment.initContainers.image }}
+          command: {{ $global.Values.deployment.initContainers.command }}
+      {{- end}}
+      {{- if $global.Values.deployment.imagePullSecret }}
+      imagePullSecrets:
+      - name: {{ $global.Values.deployment.imagePullSecret }}
+      {{- end }}
+{{- end }}
